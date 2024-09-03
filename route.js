@@ -1,83 +1,88 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const app = express();
+const db = require('./database/db');
+const query = require('./database/query'); // Import your queries module
+
+db.connectDB();
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-let users = [];
-let currentId = 1; // Memulai id dari 1
-
-// Get all users
+// Route to GET all users - returns the users array as JSON
 app.get('/users', (req, res) => {
-  res.status(200).send(users);
+  query.getAllUsers()
+    .then(users => {
+      res.status(200).json(users);
+    })
+    .catch(err => {
+      res.status(500).json({ message: 'Internal Server Error' });
+    });
 });
 
-// Get single user
+// Route to GET a single user by index
 app.get('/users/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const user = users.find(user => user.id === id);
-  
-  if (user) {
-    res.status(200).send(user);
-  } else {
-    res.status(404).send({ message: 'User Tidak Ditemukan' });
-  }
+  const id = req.params.id;
+  query.getUserById(id)
+    .then(user => {
+      if (user) {
+        res.status(200).json(user);
+      } else {
+        res.status(404).json({ message: 'User not found' });
+      }
+    })
+    .catch(err => {
+      res.status(500).json({ message: 'Internal Server Error' });
+    });
 });
 
-// Search user by name
-app.get('/search', (req, res) => {
-  const nama = req.query.nama;
-  const user = users.find(user => user.name === nama);
-  
-  if (user) {
-    res.status(200).send(user);
-  } else {
-    res.status(404).send({ message: 'User Tidak ada di database' });
-  }
-});
-
-// Create user
+// Route to POST a new user - adds a new user to the users array
 app.post('/users', (req, res) => {
-  const { name } = req.body;
-  if (!name) {
-    return res.status(400).send({ message: 'Tolong masukan nama terlebih dahulu' });
+  const { name, age } = req.body; // Extract the user from the request body
+  if (!name || !age) {
+    return res.status(400).json({ message: 'Please provide both name and age' });
   }
 
-  const user = {
-    id: currentId++, 
-    name
-  };
-
-  users.push(user);
-  res.status(201).send(user);
+  query.createUser({ name, age }) // Add the new user to the database
+    .then(user => {
+      res.status(201).json(user); // Respond with the created user and status code 201
+    })
+    .catch(err => {
+      res.status(500).json({ message: 'Internal Server Error' });
+    });
 });
 
-// Update user
+// Route to PUT (update) a user by id
 app.put('/users/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const { name } = req.body;
-  const userIndex = users.findIndex(user => user.id === id);
-
-  if (userIndex !== -1) {
-    users[userIndex].name = name;
-    res.status(200).send(users[userIndex]);
-  } else {
-    res.status(404).send({ message: 'User Tidak ada di database' });
-  }
+  const id = req.params.id;
+  const { name, age } = req.body;
+  query.updateUser(id, { name, age })
+    .then(updatedUser => {
+      if (updatedUser) {
+        res.status(200).json(updatedUser);
+      } else {
+        res.status(404).json({ message: 'User not found' });
+      }
+    })
+    .catch(err => {
+      res.status(500).json({ message: 'Internal Server Error' });
+    });
 });
 
-// Delete user
+// Route to DELETE a user by id
 app.delete('/users/:id', (req, res) => {
-  const id = parseInt(req.params.id);
-  const userIndex = users.findIndex(user => user.id === id);
-
-  if (userIndex !== -1) {
-    users.splice(userIndex, 1);
-    res.status(200).send({ message: 'User telah berhasil dihapus' });
-  } else {
-    res.status(404).send({ message: 'User Tidak ada di database' });
-  }
+  const id = req.params.id;
+  query.deleteUser(id)
+    .then(deletedUser => {
+      if (deletedUser) {
+        res.status(200).json({ message: 'User deleted successfully' });
+      } else {
+        res.status(404).json({ message: 'User not found' });
+      }
+    })
+    .catch(err => {
+      res.status(500).json({ message: 'Internal Server Error' });
+    });
 });
 
 app.listen(3000, () => {
